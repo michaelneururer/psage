@@ -50,13 +50,7 @@ from weil_module_alg import *
 from finite_quadratic_module import FiniteQuadraticModuleElement,FiniteQuadraticModule
 from psage.modform.maass.mysubgroups_alg import SL2Z_elt
 from sage.modular.arithgroup.arithgroup_element import ArithmeticSubgroupElement
-#_sage_const_3 = Integer(3);
-#_sage_const_2 = Integer(2);
-#_sage_const_1 = Integer(1);
-#_sage_const_0 = Integer(0);
-#_sage_const_4 = Integer(4);
-#_sage_const_8 = Integer(8);
-#_sage_const_10000 = Integer(10000)
+
 
 
 ###################################
@@ -134,9 +128,11 @@ class WeilModule (FormalSums):
         self._n=self._QM.order()
         self._sqn = self._n.sqrt()
         self._gens=self._QM.gens()
-        self._gen_orders=[]
-        for jj,g in enumerate(self._gens):
-            self._gen_orders.append(Integer(g.order()))
+#        self._gen_orders=[]
+#        for jj,g in enumerate(self._gens):
+#            self._gen_orders.append(Integer(g.order()))
+        self._gen_orders  = self._QM.elementary_divisors()
+
         #self._minus_element=[]
         #self._minus_element=self._get_negative_indices()
 

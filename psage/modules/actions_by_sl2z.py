@@ -40,7 +40,7 @@ from sage.all import Integer,RR,CC,QQ,ZZ,sgn,cached_method,copy,CyclotomicField,
 from weil_module_alg import *
 from psage.modform.maass.mysubgroups_alg import SL2Z_elt
 from sage.modular.arithgroup.arithgroup_element import ArithmeticSubgroupElement
-
+from psage.modform.maass.mysubgroups_alg import factor_matrix_in_sl2z
 
 def ActionOnWeilRepBySL2Z(W,**kwds):
     if W.finite_quadratic_module()<>None:
@@ -158,12 +158,12 @@ class ActionOnWeilRepBySL2Z_fqm(ActionOnWeilRepBySL2Z_generic):
             filter = None
         else:
             filter=self.create_filter(elt)
-        r,fac = self._action_of_SL2Z_by_formula_(A,filter)
-        res = self.matrix_to_weil_rep(elt,r,fac)
+        r = self._action_of_SL2Z_by_formula_(A,filter)
+        res = self.matrix_to_weil_rep(elt,r)
         if self._minimal_base_field==True:
             return res
         else:
-            return (fac,res)
+            return res
 
     def _action_of_SL2Z_by_factoring(self,A,elt=None):
          r"""
@@ -211,7 +211,7 @@ class ActionOnWeilRepBySL2Z_fqm(ActionOnWeilRepBySL2Z_generic):
         res = self.weil_rep(0)
         if self._minimal_base_field:
             #K = self._zl2.parent()
-            facalg = QuadraticField(fac**2).gens()[0]
+            #facalg = QuadraticField(fac**2).gens()[0]
             if self._act=='r':
                 for i in range(elt.degree()):
                     if elt[i] <> 0:
@@ -381,9 +381,94 @@ class ActionOnWeilRepBySL2Z_fqm(ActionOnWeilRepBySL2Z_generic):
             chi = kronecker(d,self._n)
         r=r*chi
         return r #[r,1 ]
+
     
     # Now we want the general action
 
+    def action_of_SL2Z_by_factoring_(self,A,elt=None):
+        r""" Computes the action of A in SL2Z on self
+             Using the factorization of A into S and T's
+             and the definition of rho on these elements.
+             This method works for any WeilModule but is (obviously) very slow
+             INPUT : A in SL2Z
+             OUTPUT: [r,fact]
+                     r = matrix over CyclotomicField(lcm(level,8))
+                     fact = sqrt(integer) 
+                     rho(A) = fact*r
+        """
+        if A not in SL2Z:
+            raise TypeError, "%s must be an element of SL2Z" %A
+        sgn,n,fak=factor_matrix_in_sl2z(A)
+        fak.insert(0,n) 
+        [r,fact,M]=self._weil_matrix_from_list(fak,sgn)
+        for i in range(2):
+            for j in range(2):
+                if A[i,j]<>M[i,j] and A[i,j]<>-M[i,j]:
+                    raise ValueError, "\n A=\n%s <> M=\n%s, \n factor=%s " % (A,M,fak)
+        return [r,fact]
+
+    def _weil_matrix_from_list(self,fak,sgn):
+        r"""
+        INPUT: fak = output from _factorsl2z
+                   = [a0,a1,...,ak]
+               sgn = +-1
+        OUTPUT [r,fact,M]
+               M       = sgn*T^a0*S*T^a1*...*S*T^ak
+               r*fact  = rho(M)
+               r       = matrix in CyclotomicField(lcm(level,8))
+               
+        """
+        [S,T]=SL2Z.gens()
+        M=SL2Z([1 ,0 ,0 ,1 ])
+        Z=SL2Z([-1 ,0 ,0 ,-1 ])
+        r = matrix(self._K,self._n)
+        ss = self._QM.sigma_invariant()
+        ## Do the first T^a
+        if sgn==-1:
+            r,fac=self._action_of_Z()
+            rt,fact=self._action_of_T(fak[0])
+            r=r*rt
+            fac=fac*fact
+            M=Z*T**fak[0 ]
+        else:
+            r,fac=self._action_of_T(fak[0 ])
+            M=T**fak[0 ]
+        if self._verbose>2:
+            print "M=",M
+            print "r=",r
+        A=SL2Z([1 ,0 ,0 ,1 ]) # Id
+        for j in range(1 ,len(fak)):
+            A=A*S*T**fak[j]
+        if sgn==-1 and sigma_cocycle(Z,A)==-1:
+            sfak=ss**4
+        else:
+            sfak=1 
+        # Now A should be the starting matrix except the first T factor
+        fact=1 
+        #print "A=\n",A
+        for j in range(1 ,len(fak)):
+            rN,fac=self._action_of_STn(fak[j])
+            Mtmp=S*T**fak[j]   
+            M=M*Mtmp
+            A=(Mtmp**-1 )*A
+            if(j<len(fak)-1 ):
+                si=sigma_cocycle(Mtmp,A)
+                if si==-1:
+                    #sig=Integer(si)
+                    sfak=sfak*ss**4
+            r=r*rN #*sfak
+         #   print "fact=",fact
+            fact=fact*self._n
+        r=r*sfak
+        if self._verbose>0:
+            print "sfak=",sfak
+        if hasattr(fact,"sqrt"):
+            fact = fact.sqrt()**-1
+        else:
+            fact = 1/sqrt(fact)
+        return [r, fact,M]
+
+    
     def _action_of_SL2Z_by_formula_(self,A,filter=None,**kwds):
         r"""
         The Action of A in SL2(Z) given by a matrix rho_{Q}(A)
@@ -392,12 +477,7 @@ class ActionOnWeilRepBySL2Z_fqm(ActionOnWeilRepBySL2Z_generic):
         where 1 means that we compute this entry
         of the matrix rho_{Q}(A) 
         """
-        ## extract eleements from A
-        ##[a,b,c,d]=_entries(A)
         a,b,c,d=list(A)
-        # check that A is in SL(2,Z)
-        #if(A not in SL2Z):
-        #()    raise  TypeError,"Matrix must be in SL(2,Z)!"
         ## Check if we have a generator
         sign=1
         if c==0:

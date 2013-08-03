@@ -425,13 +425,17 @@ class ModuleWithGroupActionElement_generic(FreeModuleElement):
                 s+="{0}".format(self._ambient_basis_names[i])
             elif x==-1:
                 s+="-{0}".format(self._ambient_basis_names[i])
-            else:
-                if i>0 and j>0 and str(x)[0]<>'-':
-                    s+="+"
+            else:                
                 if t==1 and (str(x)[1:].find('-')>0 or str(x).find('+')>0):
-                    s+="({0})*{1}".format(x,self._ambient_basis_names[i])
+                    term="({0})*{1}".format(x,self._ambient_basis_names[i])
                 else:
-                    s+="{0}*{1}".format(x,self._ambient_basis_names[i])
+                    term="{0}*{1}".format(x,self._ambient_basis_names[i])
+
+                if i>0 and j>0 and str(term)[0]<>'-':
+                    sig="+"
+                else:
+                    sig=""
+                s += sig+term
             j+=1
 
         return s
@@ -542,7 +546,7 @@ class ModuleWithGroupActionElement_generic(FreeModuleElement):
         r"""
         Multiply self by other
         """
-        if isinstance(other,ModuleWithGroupAction_generic_element):
+        if isinstance(other,ModuleWithGroupActionElement_generic):
             new_coords = [self._coords[i]+other._coords[i] for i in  range(self.degree())]
             return self.__class__(self.parent(),new_coords,self._name,rep=self._rep)
         else:

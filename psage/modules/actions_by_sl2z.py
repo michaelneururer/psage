@@ -35,7 +35,7 @@ Author: Fredrik Stromberg (2013)
 
 """
 
-from sage.all import SageObject,UniqueRepresentation,QuadraticField,sqrt
+from sage.all import SageObject,UniqueRepresentation,QuadraticField,sqrt,Integer
 from sage.all import Integer,RR,CC,QQ,ZZ,sgn,cached_method,copy,CyclotomicField,lcm,is_square,matrix,SL2Z,MatrixSpace,floor,ceil,is_odd,is_even,hilbert_symbol,sqrt,inverse_mod,Matrix
 from weil_module_alg import *
 from psage.modform.maass.mysubgroups_alg import SL2Z_elt
@@ -104,7 +104,7 @@ class ActionOnWeilRepBySL2Z_fqm(ActionOnWeilRepBySL2Z_generic):
         #for g in self._QM.gens():
         #    self._gen_orders.append(g.order())
         if is_square(self._n):
-            self._sqn = sqrt(n)
+            self._sqn = Integer(self._n).sqrt()
         else:
             self._sqn = QuadraticField(self._n).gens()[0] #self._n.sqrt()
         self._basis_type = basis_type

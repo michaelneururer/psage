@@ -4,10 +4,33 @@ Classes for Weil representations associated with
  - Finite quadratic modules (eq. with even lattices)
  - Lattices (both odd and even)
 
+Class structure:
+
+WeilModule_generic(ModuleWithGroupAction_generic)
+        self._element_class = WeilModule_element_generic
+    WeilModule_generic_pid(WeilModule_generic,ModuleWithGroupAction_generic_pid)
+        self._submodule_class = WeilModule_submodule_with_basis_pid
+        WeilModule_ambient_pid(WeilModule_generic_pid,FreeModule_ambient_pid)
+
+    WeilModule_submodule_with_basis_pid(WeilModule_generic,FreeModule_submodule_with_basis_pid):
+        WeilModule_invariant_submodule(WeilModule_submodule_with_basis_pid):
+
+   WeilModule_generic_fqm(WeilModule_generic_pid):
+        _element_class = WeilModule_element_generic
+        _submodule_class = WeilModule_submodule_fqm
+        WeilModule_ambient_fqm(WeilModule_generic_fqm,WeilModule_ambient_pid)
+       WeilModule_submodule_fqm(WeilModule_submodule_with_basis_pid,WeilModule_generic_fqm)
+   WeilModule_ambient_lattice(WeilModule_ambient_pid):
+
+WeilModuleElement_generic(ModuleWithGroupAction_generic_element)
+    WeilModuleElement_fqm
+
+ 
 """
 
 from sage.modules.free_module import FreeModule_generic_pid,FreeModule_ambient_pid,FreeModule_submodule_with_basis_pid,FreeModule_generic,is_FreeModule
-from sage.all import ZZ,Gamma0,CyclotomicField,lcm,SL2Z
+
+from sage.all import ZZ,Gamma0,CyclotomicField,lcm,SL2Z,FormalSum
 from sage.structure.element import ModuleElement
 from sage.misc.cachefunc import cached_method
 from psage.modules.module_with_group_action import *
@@ -31,8 +54,8 @@ class WeilModule_generic(ModuleWithGroupAction_generic):
         """
         self._lattice = lattice
         self._fqm = finite_quadratic_module
-        super(WeilModule_generic,self).__init__(base_ring,rank,degree,group)
-        self._element_class = WeilModule_element_generic
+        super(WeilModule_generic,self).__init__(base_ring,rank,degree,group,**kwds)
+        self._element_class = WeilModuleElement_generic
         self._act_by = ActionOnWeilRepBySL2Z(self,minimal_base_field=minimal_base_field)
 
     def __repr__(self):
@@ -135,7 +158,7 @@ class WeilModule_submodule_with_basis_pid(WeilModule_generic,FreeModule_submodul
         """
         return self._ambient_module
 
-class WeilModule_invariant_submodule(WeilModule_submodule_with_basis_pid):
+class WeilModuleInvariants_generic(WeilModule_submodule_with_basis_pid):
     r"""
     A submodule of SL2(Z) invariants of a Weil module
     """
@@ -144,52 +167,6 @@ class WeilModule_invariant_submodule(WeilModule_submodule_with_basis_pid):
         Initialize a submodule of SL2(Z) invariants of a Weil module
         """
         pass
-
-        
-class WeilModule_element_generic(ModuleWithGroupAction_generic_element):
-    r"""
-    Elements of a Weil module
-    """
-
-    def __init__(self,parent,coords,coerce=False,copy=False,name=None,rep='',is_immutable=True,function=None):        
-        r"""
-        Initialize an element of a Weil module.
-        """
-        self._coords = coords
-        super(WeilModule_element_generic,self).__init__(parent,coords,coerce=coerce,copy=copy,name=name,rep=rep,is_immutable=is_immutable)
-
-    def __repr__(self):
-        r"""
-        Represent self.
-        """
-        if self._name<>None:
-            return str(self._name)
-        if self._rep<>'':
-            return "An element of a generic Weil module. Coords:={0}".format(self.coords())
-        else:
-            return super(WeilModule_element_generic,self).__repr__()
-    def coords(self):
-        r"""
-        Return the coordinates of self in terms of the basis of self.parent()
-        """
-        return self._coords
-    
-    @cached_method 
-    def __call__(self,x):
-        r"""
-        Act by self on `x` in `L^{\bullet}`
-        """
-        assert x in self.parent().lattice().bullet_elements()
-        return self._function(x)
-
-
-    def group_action(self,A):
-        r"""
-        Action of the element A in self.group() on self.
-        
-        """
-        return self.parent()._act_by.action_by_sl2z_on_element(A,self)
-    #return self.parent()._act_by.action_by_sl2z_on_element(A,self)
 
     
 def WeilModule_invariant_class(WeilModuleElement_generic):
@@ -231,7 +208,7 @@ class WeilModule_generic_fqm(WeilModule_generic_pid):
         degree = rank
         group = SL2Z
         super(WeilModule_generic_fqm,self).__init__(base_ring,rank,degree,group,finite_quadratic_module=F,**kwds)
-        self._element_class = WeilModule_element_generic
+        self._element_class = WeilModuleElement_fqm
         self._submodule_class = WeilModule_submodule_fqm
         ### Some special paraeters we need to initialize
         self._level = F.level()
@@ -371,6 +348,103 @@ class WeilModule_ambient_lattice(WeilModule_ambient_pid):
         base_ring = CyclotomicField(lcm(L.level(),8))
         super(WeilRepresentation_ambient_lattice,self).__init__(base_ring,rank,rank,group,lattice=L)
 
+
+###
+### Element classes
+###
+class WeilModuleElement_generic(ModuleWithGroupActionElement_generic):
+    r"""
+    Elements of a Weil module
+    """
+
+    def __init__(self,parent,coords,coerce=False,copy=False,name=None,rep='',is_immutable=False,function=None):        
+        r"""
+        Initialize an element of a Weil module.
+        """
+        super(WeilModuleElement_generic,self).__init__(parent,coords,coerce=coerce,copy=copy,name=name,rep=rep,is_immutable=is_immutable)
+
+    def __repr__(self):
+        r"""
+        Represent self.
+        """
+        if self._name<>None:
+            return str(self._name)
+        if self._rep<>'':
+            return "An element of a generic Weil module. Coords:={0}".format(self.coords())
+        else:
+            return super(WeilModuleElement_generic,self).__repr__()
+        
+    def coords(self):
+        r"""
+        Return the coordinates of self in terms of the basis of self.parent()
+        """
+        return self._coords
+    
+    @cached_method 
+    def __call__(self,x):
+        r"""
+        Act by self on `x` in `L^{\bullet}`
+        """
+        assert x in self.parent().lattice().bullet_elements()
+        return self._function(x)
+
+
+    def group_action(self,A):
+        r"""
+        Action of the element A in self.group() on self.
+        
+        """
+        raise NotImplementedError("Should be implemented in subclasses!")
+
+    
+class WeilModuleElement_fqm(WeilModuleElement_generic):
+    r"""
+    Elements of a Weil module
+    """
+
+    def __init__(self,parent,coords,coerce=False,copy=False,name=None,rep='',is_immutable=False,function=None):        
+        r"""
+        Initialize an element of a Weil module.
+        """
+        self._coords = coords
+        super(WeilModuleElement_fqm,self).__init__(parent,coords,coerce=coerce,copy=copy,name=name,rep=rep,is_immutable=is_immutable)
+        assert isinstance(parent,WeilModule_generic_fqm)
+
+
+    def __repr__(self):
+        r"""
+        Represent self
+        """
+        if self._rep=='fqm':
+            return str(self.as_fqm())
+        else:
+            return super(WeilModuleElement_fqm,self).__repr__()
+            
+    def as_fqm(self):
+        r"""
+        Return self as a formal sum of elements of a finite quadratic module.
+        """
+        res = []
+        for i in range(self._degree):
+            res.append((self._coords[i],self.parent().elt(i)))
+        return FormalSum(res)
+        
+        
+    def group_action(self,A):
+        r"""
+        Action of the element A in self.group() on self.
+        
+        """
+        return self.parent()._act_by.action_by_sl2z_on_element(A,self)
+
+
+    
+
+
+        
+        
+
+        
 ###
 ### Access methods
 ###
@@ -403,4 +477,9 @@ def WeilRepresentationElement(W,coords=None,function=None):
         for x in W.basis():
             j = function(x)
             coords.append( function(x) )
-    return WeilModule_element_generic(W,coords)
+    if W.finite_quadratic_module()<>None:
+        return WeilModuleElement_fqm(W,coords)
+    else:
+        return WeilModuleElement_generic(W,coords)
+
+

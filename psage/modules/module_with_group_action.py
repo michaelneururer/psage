@@ -16,7 +16,7 @@ Implements basic classes for modules over rings with an additional
 
 
 from sage.modules.free_module import FreeModule_generic_pid,FreeModule_ambient_pid,FreeModule_submodule_with_basis_pid,FreeModule_generic,FreeModule_ambient,FreeModule_submodule_pid,is_FreeModule
-from sage.all import ZZ,Sequence,copy
+from sage.all import ZZ,Sequence,copy,QQ
 #from sage.structure.element import ModuleElement
 from sage.modules.free_module_element import FreeModuleElement
 from sage.misc.cachefunc import cached_method
@@ -43,12 +43,11 @@ class ModuleWithGroupAction_generic(FreeModule_generic):
             #       super(ModuleWithGroupAction_generic,self).__init__(base_ring,rank,degree,sparse=False)
         FreeModule_generic.__init__(self,base_ring,rank,degree)
         # names for the basis vectors
-        name = kwds.get('ambient_names','e')
-
-        if isinstance(name,(list,tuple)) and len(name)==rank:
-            self._ambient_basis_names = name
+        names = kwds.get('names','e')
+        if isinstance(names,(list,tuple)) and len(names)==rank:
+            self._ambient_basis_names = names
         else:
-            self._ambient_basis_names=['{0}{1}'.format(name,j) for j in range(degree)]
+            self._ambient_basis_names=['{0}{1}'.format(names,j) for j in range(degree)]
         
     def __repr__(self):
         r"""
@@ -125,7 +124,7 @@ class ModuleWithGroupAction_generic_pid(ModuleWithGroupAction_generic, FreeModul
         """
         self._group = group
         if not hasattr(self,'_element_class') or self._element_class==None:
-            self._element_class = ModuleWithGroupAction_generic_element
+            self._element_class = ModuleWithGroupActionElement_generic
         if not hasattr(self,'_submodule_class') or self._submodule_class==None:
             self._submodule_class = ModuleWithGroupAction_submodule_pid
         #super(ModuleWithGroupAction_generic_pid,self).__init__(base_ring,rank,degree,group,**kwds)
@@ -216,7 +215,7 @@ class ModuleWithGroupAction_ambient(ModuleWithGroupAction_generic,FreeModule_amb
     r"""
     Ambient module with group action.
     """
-    def __init__(self,base_ring,rank,degree,group):
+    def __init__(self,base_ring,rank,degree,group,**kwds):
         r"""
         Initialize an ambient module with group action.
 
@@ -228,7 +227,7 @@ class ModuleWithGroupAction_ambient(ModuleWithGroupAction_generic,FreeModule_amb
             sage: M.is_ambient()
             True
         """
-        super(ModuleWithGroupAction_ambient,self).__init__(base_ring,rank,degree,group)
+        super(ModuleWithGroupAction_ambient,self).__init__(base_ring,rank,degree,group,**kwds)
 
     def __repr__(self):
         r"""
@@ -250,7 +249,7 @@ class ModuleWithGroupAction_ambient_pid(ModuleWithGroupAction_ambient,FreeModule
     r"""
     Ambient module over a PID with group action.
     """
-    def __init__(self,base_ring,rank,degree,group):
+    def __init__(self,base_ring,rank,degree,group,**kwds):
         r"""
         Initialize an ambient module with group action.
 
@@ -263,7 +262,7 @@ class ModuleWithGroupAction_ambient_pid(ModuleWithGroupAction_ambient,FreeModule
             True
         """
         assert is_PrincipalIdealDomain(base_ring)
-        super(ModuleWithGroupAction_ambient_pid,self).__init__(base_ring,rank,degree,group)
+        super(ModuleWithGroupAction_ambient_pid,self).__init__(base_ring,rank,degree,group,**kwds)
 
     def __repr__(self):
         r"""
@@ -287,7 +286,7 @@ class ModuleWithGroupAction_submodule_pid(ModuleWithGroupAction_generic,FreeModu
     A submodule of a Weil module.
     """
 
-    def __init__(self,ambient,gens,check=True,echelonize=False,echelonized_basis=None,already_echelonized=False):
+    def __init__(self,ambient,gens,check=True,echelonize=False,echelonized_basis=None,already_echelonized=False,**kwds):
         r"""
         Initialize a generic submodule of a Weil module.
 
@@ -313,7 +312,7 @@ class ModuleWithGroupAction_submodule_pid(ModuleWithGroupAction_generic,FreeModu
         if echelonized_basis == False: #Check
             echelonized_basis = is_in_echelon_form(basis)
         FreeModule_submodule_with_basis_pid.__init__(self,ambient,gens,check=check,echelonize=echelonize,echelonized_basis=echelonized_basis,already_echelonized=already_echelonized)
-        ModuleWithGroupAction_generic.__init__(self,ambient.base_ring(),rank,ambient.degree(),ambient.group())
+        ModuleWithGroupAction_generic.__init__(self,ambient.base_ring(),rank,ambient.degree(),ambient.group(),**kwds)
 #        super(ModuleWithGroupAction_submodule_pid,self).__init__(ambient.base_ring(),rank,ambient.degree(),ambient.group())
 
     def __repr__(self):
@@ -350,7 +349,7 @@ class ModuleWithGroupAction_invariant_submodule_pid(ModuleWithGroupAction_submod
     r"""
     A submodule of SL2(Z) invariants of a Weil module
     """
-    def __init__(self,ambient,gens):
+    def __init__(self,ambient,gens,**kwds):
         r"""
         Initialize a submodule of SL2(Z) invariants of a Weil module
 
@@ -359,10 +358,10 @@ class ModuleWithGroupAction_invariant_submodule_pid(ModuleWithGroupAction_submod
 
         
         """
-        super(ModuleWithGroupAction_invariant_submodule_pid,self).__init__(ambient,gens)
+        super(ModuleWithGroupAction_invariant_submodule_pid,self).__init__(ambient,gens,**kwds)
 
         
-class ModuleWithGroupAction_generic_element(FreeModuleElement):
+class ModuleWithGroupActionElement_generic(FreeModuleElement):
     r"""
     Elements of a module with group action.
     """
@@ -391,7 +390,7 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
             self._ambient_basis_names=parent._ambient_basis_names
         else:
             self._ambient_basis_names=['e{0}'.format(j) for j in range(self.degree())]
-        super(ModuleWithGroupAction_generic_element,self).__init__(parent)
+        super(ModuleWithGroupActionElement_generic,self).__init__(parent)
 
 
     def __copy__(self):
@@ -413,6 +412,9 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
             return '0'
         s=""
         j=0
+        t = 0
+        if self.base_ring()<>QQ and self.base_ring()<>ZZ:
+            t = 1
         for i in range(len(self._coords)):
             x = self._coords[i]
             if x==0:
@@ -424,9 +426,12 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
             elif x==-1:
                 s+="-{0}".format(self._ambient_basis_names[i])
             else:
-                if not x<0 and i>0 and j>0 and str(x)[0]<>'-':
+                if i>0 and j>0 and str(x)[0]<>'-':
                     s+="+"
-                s+="{0}*{1}".format(x,self._ambient_basis_names[i])
+                if t==1 and (str(x)[1:].find('-')>0 or str(x).find('+')>0):
+                    s+="({0})*{1}".format(x,self._ambient_basis_names[i])
+                else:
+                    s+="{0}*{1}".format(x,self._ambient_basis_names[i])
             j+=1
 
         return s
@@ -493,7 +498,7 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
         """
         if g in self.base_ring():
             new_coords = [self._coords[i]*g for i in range(self._degree)]
-            return self.__class__(self.parent(),new_coords,self._name,self._rep,self._is_immutable)
+            return self.__class__(self.parent(),new_coords,self._name,self._rep)
         else:
             raise ValueError,"Can not multiply {0} by {1}".format(self,g)
         
@@ -503,7 +508,7 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
         """
         if g in self.base_ring():
             new_coords = [g*self._coords[i] for i in range(self._degree)]
-            return self.__class__(self.parent(),new_coords,self._name,self._rep,self._is_immutable)
+            return self.__class__(self.parent(),new_coords,self._name,self._rep)
         elif g in self.group():
             return self.group_action(g)
         else:
@@ -538,8 +543,8 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
         Multiply self by other
         """
         if isinstance(other,ModuleWithGroupAction_generic_element):
-            new_coords=[ self._coords[i]+other._coords[i] for i in  range(self.degree())]
-            return self.__class__(self.parent(),new_coords,self._name,rep=self._rep,is_immutable = self._is_immutable)
+            new_coords = [self._coords[i]+other._coords[i] for i in  range(self.degree())]
+            return self.__class__(self.parent(),new_coords,self._name,rep=self._rep)
         else:
             raise ValueError,"Can not add {0} to {1}".format(self,other)
 

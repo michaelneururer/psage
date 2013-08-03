@@ -450,11 +450,11 @@ class ModuleWithGroupAction_generic_element(FreeModuleElement):
         else:
             self._is_immutable = not self._is_immutable
 
-    def is_zero(self):
+    def __nonzero__(self):
         for x in self._coords:
             if x<>0:
-                return False
-        return True
+                return True
+        return False
     
     def __setitem__(self,key,item):
         if self._is_immutable:

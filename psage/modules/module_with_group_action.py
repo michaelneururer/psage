@@ -39,7 +39,7 @@ class ModuleWithGroupAction_generic(FreeModule_generic):
         """
         self._group = group
         if not hasattr(self,'_element_class') or self._element_class==None:
-            self._element_class = ModuleWithGroupAction_generic_element
+            self._element_class = ModuleWithGroupActionElement_generic
             #       super(ModuleWithGroupAction_generic,self).__init__(base_ring,rank,degree,sparse=False)
         FreeModule_generic.__init__(self,base_ring,rank,degree)
         # names for the basis vectors

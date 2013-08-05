@@ -29,7 +29,7 @@ AUTHOR:
 
 """
 
-from sage.modules.vector_integer_dense import *
+#from sage.modules.vector_integer_dense import *
 from sage.misc.functional import is_even
 from sage.rings.arith import kronecker,odd_part,gcd,valuation,is_prime
 from sage.rings.integer import Integer
@@ -134,7 +134,7 @@ cpdef cython_xis(int a, int b, int c, int d, W):
         if(p==2 ):
             if(is_even(c)):
                 if(c % q<>0 ):
-                    odt=self._get_oddity(p,nq,r,ep,t)
+                    odt=W._get_oddity(p,nq,r,ep,t)
                     argl=-a*ccq*odt
                     gammaf=z8**argl
                     dc=kronecker(-a*ccq,qqc**r)
@@ -403,7 +403,7 @@ cpdef action_of_Gamma0_mpc(W,a,b,c,d,filter=None,prec=53,verbose=0):
                 argl=b*d*int(level*W.Q(W._L[jj]))
                 r[ii,jj]=zl**argl
     # Compute the character 
-    signature = inv['signature']
+    signature = W._inv['signature']
     if W._level % 4  == 0:
         test = (signature + kronecker(-1 ,W._n)) % 4
         if is_even(test):

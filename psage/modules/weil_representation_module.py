@@ -30,13 +30,14 @@ WeilModuleElement_generic(ModuleWithGroupAction_generic_element)
 
 from sage.modules.free_module import FreeModule_generic_pid,FreeModule_ambient_pid,FreeModule_submodule_with_basis_pid,FreeModule_generic,is_FreeModule
 
-from sage.all import ZZ,Gamma0,CyclotomicField,lcm,SL2Z,FormalSum
+from sage.all import ZZ,Gamma0,CyclotomicField,lcm,SL2Z,FormalSum,Matrix
 from sage.structure.element import ModuleElement
 from sage.misc.cachefunc import cached_method
 from psage.modules.module_with_group_action import *
 from psage.modules.finite_quadratic_module import FiniteQuadraticModule_ambient
-import actions_by_sl2z 
-from actions_by_sl2z import ActionOnWeilRepBySL2Z
+#import actions_by_sl2z 
+#from actions_by_sl2z import ActionOnWeilRepBySL2Z
+from actions_by_sl2z import ActionOnWeilRepBySL2Z_fqm,ActionOnWeilRepBySL2Z_lattice,ActionOnWeilRepBySL2Z_generic
 from sage.structure.element import Matrix as Matrix_Type
 from weil_module_alg import *
 
@@ -50,21 +51,35 @@ class WeilModule_generic(ModuleWithGroupAction_generic):
 
         INPUT:
 
+        - `base_ring` -- Ring
+        - `rank` -- Integer
+        - `degree` -- Integer
+        - `group` -- Group
+        - `lattice` -- Lattice
+        - `finite_quadratic_module` -- FiniteQuadraticModule
         - `minimal_base_field` -- bool Set to true if you want to work with cyclotomic field of order 2*level (gives uglier formulas and is slower than working in order lcm(8,level) )
+
+        EXAMPLES::
+        
+            sage: W=WeilModule_generic(ZZ,3,3,SL2Z)
+            Generic Weil module of rank 3 and degree 3 with action of Modular Group SL(2,Z)
+            
+
         """
         self._lattice = lattice
         self._fqm = finite_quadratic_module
         super(WeilModule_generic,self).__init__(base_ring,rank,degree,group,**kwds)
         self._element_class = WeilModuleElement_generic
         self._act_by = ActionOnWeilRepBySL2Z(self,minimal_base_field=minimal_base_field)
-
+        self._inner_product_matrix=None
+       
     def __repr__(self):
         r"""
         Representing self.
         """
-        return "Generic Weil module of rank {0} and degree {1}".format(self.rank(),self.degree())
+        return "Generic Weil module of rank {0} and degree {1} with action of {2}".format(self.rank(),self.degree(),self.group())
 
-        
+
     ## The methods we want to have
     def lattice(self):
         r"""
@@ -78,8 +93,20 @@ class WeilModule_generic(ModuleWithGroupAction_generic):
         Return the finite quadratic module associated with self (if it exists)
         """
         return self._fqm
-    #raise NotImplementedError("Should be overriden by subclasses")
 
+    def Bi(self,i,j):
+        r"""
+        Return the bilinear form on the element i and j of th associated 
+        """
+        raise NotImplementedError
+
+    def Qi(self,i,j):
+        r"""
+        """
+        raise NotImplementedError
+
+
+    
     def invariants(self):
         r"""
         Return the space of invariants of self under the SL(2,Z) action.
@@ -247,10 +274,15 @@ class WeilModule_generic_fqm(WeilModule_generic_pid):
 
     @cached_method    
     def Bi(self,i,j):
+        r"""
+
+        """
         return self._fqm.B(self._elt(i),self._elt(j))
     
     @cached_method
-    def Q(self,i):
+    def Qi(self,i):
+        r"""
+        """
         return self._fqm.Q(self._elt(i))
 
     @cached_method
@@ -482,4 +514,14 @@ def WeilRepresentationElement(W,coords=None,function=None):
     else:
         return WeilModuleElement_generic(W,coords)
 
-
+def ActionOnWeilRepBySL2Z(W,**kwds):
+    r"""
+    Return an instance of the class which provides the SL2Z-action on a Weil representation.
+    """
+    if isinstance(W,WeilModule_generic_fqm):
+        return ActionOnWeilRepBySL2Z_fqm(W,**kwds)
+    elif isinstance(W,WeilModule_generic_lattice):
+        return ActionOnWeilRepBySL2Z_lattice(W,**kwds)
+    else:
+        return ActionOnWeilRepBySL2Z_generic(W)
+    

@@ -37,19 +37,21 @@ Author: Fredrik Stromberg (2013)
 
 from sage.all import SageObject,UniqueRepresentation,QuadraticField,sqrt,Integer
 from sage.all import Integer,RR,CC,QQ,ZZ,sgn,cached_method,copy,CyclotomicField,lcm,is_square,matrix,SL2Z,MatrixSpace,floor,ceil,is_odd,is_even,hilbert_symbol,sqrt,inverse_mod,Matrix
+
 from weil_module_alg import *
+#from sage.misc.lazy_import import lazy_import
+#lazy_import('weil_representation_module.WeilModule_generic_fqm','WeilModule_generic_fqm')
+#from weil_representation_module import WeilModule_generic_fqm
+#from psage.modules.weil_representation_module import WeilModule_generic_fqm
+#from psage.modules.weil_representation_module import WeilModule_generic_lattice
+
+
+
 from psage.modform.maass.mysubgroups_alg import SL2Z_elt
 from sage.modular.arithgroup.arithgroup_element import ArithmeticSubgroupElement
 from psage.modform.maass.mysubgroups_alg import factor_matrix_in_sl2z
 
-def ActionOnWeilRepBySL2Z(W,**kwds):
-    if W.finite_quadratic_module()<>None:
-        return ActionOnWeilRepBySL2Z_fqm(W,**kwds)
-    elif W.lattice()<>None:
-        return ActionOnWeilRepBySL2Z_lattice(W,**kwds)
-    else:
-        return ActionOnWeilRepBySL2Z_generic(W)
-    
+
 class ActionOnWeilRepBySL2Z_generic(SageObject):
     r"""
     Implements the action SL(2,Z) on a Weil representation.

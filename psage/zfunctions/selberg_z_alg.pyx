@@ -3,37 +3,28 @@
 #include "/home/fredrik/install/sage/devel/sage-mpc_test/sage/ext/interrupt.pxi"
 #import cython
 
-#include 'sage/ext/stdsage.pxi'
-#include "sage/ext/cdefs.pxi"
-#include 'sage/ext/interrupt.pxi'
-#include "sage/rings/mpc.pxi"
 
 
-include 'sage/ext/stdsage.pxi'
-include "sage/ext/cdefs.pxi"
-include 'sage/ext/interrupt.pxi'
-#include "sage/ext/gmp.pxi"
+from psage.rings.mp_cimports cimport *
+
+
 #include "sage/rings/mpc.pxi"
 from psage.rings.mpfr_nogil cimport *
 from sage.all import save,incomplete_gamma,load
 import mpmath    
 import cython
 from libc.stdlib cimport abort, malloc, free
-    
+from sage.libs.flint.fmpz_mat cimport *
+from sage.libs.flint.fmpz cimport *
+
 from cython.parallel cimport parallel, prange
 
 #from sage.libs.mpfr cimport *
 import sys
-cdef mpc_rnd_t rnd
-cdef mpfr_rnd_t rnd_re
-rnd = MPC_RNDNN
-rnd_re = MPFR_RNDN
-from sage.rings.complex_mpc cimport MPComplexNumber
+
 from sage.rings.complex_mpc import MPComplexField
-from sage.rings.real_mpfr cimport RealNumber,RealField_class
 from sage.rings.real_mpfr import RealField
 
-from sage.rings.complex_number cimport ComplexNumber
 from sage.rings.complex_field import ComplexField
 from sage.rings.integer import Integer,is_Integer
 from sage.all import exp,I,CC,vector
@@ -117,18 +108,25 @@ from sage.rings.complex_mpc import _mpfr_rounding_modes,_mpc_rounding_modes
 from sage.all import zeta
 from sage.matrix.matrix_integer_dense cimport Matrix_integer_dense
 
+from sage.rings.complex_mpc cimport MPComplexNumber
 
 cpdef pochammer_over_fak(MPComplexNumber z,int n):
     cdef MPComplexNumber res
+    cdef mpc_t resv
     cdef int prec = z.parent().prec()
+    mpc_init2(resv,prec)
     res = MPComplexField(prec)(0)
-    _pochammer_over_fak(&res.value,z.value,n,rnd,rnd_re)
+    
+    _pochammer_over_fak(&resv,z.value,n,rnd,rnd_re)
+    mpc_set(res.value,resv,rnd)
+    mpc_clear(resv)
     return res
 
 cdef inline void _pochammer_over_fak(mpc_t *res, mpc_t z, int n,mpc_rnd_t rnd,mpfr_rnd_t rnd_re) nogil:
     r""" Compute the Pochammer symbol (s)_{n} / n!   """
     cdef int j
-    cdef mpc_t x,zz,t[2]
+    cdef mpc_t x,zz
+    cdef mpc_t t[2]
     cdef int prec= mpc_get_prec(z) +50 
     mpc_init2(t[0],prec)
     mpc_init2(t[1],prec)
@@ -195,10 +193,11 @@ cpdef trop_approximation(Matrix_complex_dense A, Matrix_integer_dense B, int M0,
 
 
 
-cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nmax, mpc_t s, mpfr_t llambda, mpc_rnd_t rnd,mpfr_rnd_t rnd_re,int verbose=0):
+cdef setup_approximation(mpc_t** A, int M,  fmpz_mat_t Nij, int dim, int q, int Nmax, mpc_t s, mpfr_t llambda, mpc_rnd_t rnd,mpfr_rnd_t rnd_re,int verbose=0):
     r""" Setup the Matrix approximation of the transfer operator.  """
     cdef int i,j,k,l,n,nn
     cdef mpc_t twos,tmp,tmp1,clambda,AA,poc
+    cdef mpz_t tmp_mpz 
     cdef int prec = mpc_get_prec(s)
     cdef mpc_t t[4]
     cdef mpc_t *Z=NULL,*lpow=NULL,*twozn=NULL
@@ -206,8 +205,11 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
     cdef mpfr_t **B
     cdef int **abN
     cdef MPComplexNumber z,twoz,tmpz
+    cdef mpc_t mpc_zv
+
     sig_on()
     #print "in setup_approx!"
+    mpc_init2(mpc_zv,prec)
     mpc_init2(AA,prec)
     mpc_init2(poc,prec)
     mpc_init2(tmp,prec); mpc_init2(tmp1,prec)
@@ -218,6 +220,7 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
     mpc_set_fr(clambda,llambda,rnd)
     mpc_set(twos,s,rnd)
     mpc_mul_ui(twos,twos,2,rnd)
+    mpz_init(tmp_mpz)
     #mpc_mul_ui(twoz,2,rnd)
     CF = MPComplexField(prec)
     tmpz=CF(0)
@@ -251,9 +254,10 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
         abN[i] = <int *> sage_malloc(sizeof(int)*(dim))
         if abN[i]==NULL: raise MemoryError
         for j in range(dim):
+            fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,j))
+            abN[i][j]=mpz_get_si(tmp_mpz)
             if verbose>0:
-                print "N[{0}][{1}]={2}".format(i,j,<int>Nij[i][j])
-            abN[i][j]=mpz_get_si(Nij[i][j])
+                print "N[{0}][{1}]={2}".format(i,j,abN[i][j])
             abN[i][j]=abs(abN[i][j])
 
     for n in range(2*M+1):
@@ -261,7 +265,8 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
         mpc_init2(twozn[n],prec)
         mpc_add_ui(twozn[n],twos,n,rnd)
         #_mpc_set(&twozn[i],tmpprec)
-        _mpc_set(&twoz.value,twozn[n],rnd_re)
+#        _mpc_set(&twoz.value,twozn[n],rnd_re)
+        mpc_set(twoz.value,twozn[n],rnd)
         z = twoz.zeta()
         mpc_init2(Z[n],prec)
         mpc_set(Z[n],z.value,rnd)
@@ -317,7 +322,8 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
                         else:
                             mpc_set(AA,Z[k+n],rnd)
                             _mpc_sub(&AA,AA,lsum[k+n][i][j],rnd_re)
-                        if mpz_sgn(Nij[i][j])>0 and sg==-1:
+                        fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,j))                        
+                        if mpz_sgn(tmp_mpz)>0 and sg==-1:
                             #AA=-AA
                             mpfr_neg(AA.re,AA.re,rnd_re)
                             mpfr_neg(AA.im,AA.im,rnd_re)
@@ -381,7 +387,7 @@ cdef setup_approximation(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int Nma
 
 
 
-cdef setup_approximation_sym(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int eps, int Nmax, mpc_t s, mpfr_t llambda, mpc_rnd_t rnd,mpfr_rnd_t rnd_re,mpfr_t* alphas,mpfr_t* rhos,verbose=0):
+cdef setup_approximation_sym(mpc_t** A, int M,  fmpz_mat_t Nij, int dim, int q, int eps, int Nmax, mpc_t s, mpfr_t llambda, mpc_rnd_t rnd,mpfr_rnd_t rnd_re,mpfr_t* alphas,mpfr_t* rhos,verbose=0):
     r"""    Setup the Matrix approximation of the transfer operator (version 3).  """
     cdef int i,j,k,l,n,nn
     cdef mpc_t twos,tmp,tmp1,clambda,poc, *AA
@@ -398,6 +404,7 @@ cdef setup_approximation_sym(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int
     cdef mpz_t binc
     cdef mpfr_t fak1,fak2,fak
     cdef RealNumber tmpx
+    cdef mpz_t tmp_mpz
     sig_on()
     RF = RealField(prec)
     CF = MPComplexField(prec)
@@ -406,6 +413,7 @@ cdef setup_approximation_sym(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int
     twozz = CFF(0)
     tmpx = RF(0)
     mpmath.mp.prec=prec
+    mpz_init(tmp_mpz)
     z = CF(0)
     assert abs(eps)==1
     if verbose>0:
@@ -468,13 +476,17 @@ cdef setup_approximation_sym(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int
         #lsum[n]=<mpc_t **> sage_malloc(sizeof(mpc_t*)*(dim))
         mpc_init2(twozn[n],prec)
         mpc_add_ui(twozn[n],twos,n,rnd)
-        _mpc_set(&twoz.value,twozn[n],rnd_re)
+        #_mpc_set(&twoz.value,twozn[n],rnd_re)
+        mpc_set(twoz.value,twozn[n],rnd)
         mpc_neg(minus_twoz,twoz.value,rnd)
         twozz=CFF(twoz.real(),twoz.imag())
         for i in range(sym_dim):
             for j in range(sym_dim):
-                mpfr_set_z(B._entries[0],Nij[i][j],rnd_re)
-                mpfr_set_z(B._entries[1],Nij[i][dim-1-j],rnd_re)
+                fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,j))
+                mpfr_set_z(B._entries[0],tmp_mpz,rnd_re)
+                fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,dim-1-j))
+                #mpfr_set_z(B._entries[1],Nij[i][dim-1-j],rnd_re)
+                mpfr_set_z(B._entries[1],tmp_mpz,rnd_re)
                 #B[0] = RF(self._Nij[i,j])
                 #B[1] = RF(self._Nij[i,dim-1-j]) 
                 mpfr_div(xarg.value,alphas[i],llambda,rnd_re)
@@ -528,9 +540,10 @@ cdef setup_approximation_sym(mpc_t** A, int M,  mpz_t** Nij, int dim, int q, int
                 for j in range(sym_dim):
                     ni = i*(M+1)+n
                     kj = j*(M+1)+k
-
-                    mpfr_set_z(B._entries[0],Nij[i][j],rnd_re)
-                    mpfr_set_z(B._entries[1],Nij[i][dim-1-j],rnd_re)
+                    fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,j))
+                    mpfr_set_z(B._entries[0],tmp_mpz,rnd_re)
+                    fmpz_get_mpz(tmp_mpz,fmpz_mat_entry(Nij,i,dim-1-j))
+                    mpfr_set_z(B._entries[1],tmp_mpz,rnd_re)
                     #B[1] = RF(Nij[i][dim-1-j])
                     for ii in range(2):
                         mpc_set_ui(AA[ii],0,rnd)
@@ -790,7 +803,8 @@ cdef setup_Gauss_c(mpc_t** A, mpfr_t s, mpfr_t t, mpfr_t alpha, mpfr_t rho,int r
             mpc_init2(Z[n],prec)        
             mpc_init2(twozn[n],prec)
             mpc_add_ui(twozn[n],twos,n+lmin,rnd)
-            _mpc_set(&twoz.value,twozn[n],rnd_re)
+            #_mpc_set(&twoz.value,twozn[n],rnd_re)
+            mpc_set(twoz.value,twozn[n],rnd)
             mpc_neg(minus_twoz,twoz.value,rnd)
             #twozz=CFF(twoz.real(),twoz.imag())
             # mpz = mpmath.mp.zeta(twozz,xarg)        
@@ -807,7 +821,8 @@ cdef setup_Gauss_c(mpc_t** A, mpfr_t s, mpfr_t t, mpfr_t alpha, mpfr_t rho,int r
             mpc_init2(Z[n],prec)        
             mpc_init2(twozn[n],prec)
             mpc_add_ui(twozn[n],twos,n+lmin,rnd)
-            _mpc_set(&twoz.value,twozn[n],rnd_re)
+            #_mpc_set(&twoz.value,twozn[n],rnd_re)
+            mpc_set(twoz.value,twozn[n],rnd)
             mpc_neg(minus_twoz,twoz.value,rnd)
             twozz=CFF(twoz.real(),twoz.imag())
             mpz = mpmath.mp.zeta(twozz,xarg)        

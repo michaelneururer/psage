@@ -152,16 +152,16 @@ EXAMPLES::
 #*****************************************************************************
 
 import mpmath
-from sage.all import SageObject,Parent,ln,latex,random,divisors,ModularForms,prime_divisors,real,imag,PowerSeriesRing,PolynomialRing
+from sage.all import SageObject,Parent,ln,latex,random,divisors,ModularForms,prime_divisors,real,imag,PowerSeriesRing,PolynomialRing,CyclotomicField,dimension_cusp_forms,dimension_modular_forms,CuspForms
 from mpmath import mpf
-from mysubgroup import *
+from psage.modform.arithgroup.mysubgroup import *
 from automorphic_forms_alg import *
 from sage.all import I,dumps,loads,ComplexField,LaurentPolynomialRing
 
 
 from multiplier_systems import *
 from psage.matrix.matrix_complex_dense import *
-
+from psage.modform.arithgroup.all import MySubgroup,MySubgroup_class
 from sage.all import magma
 
 from vv_harmonic_weak_maass_forms_alg import vv_harmonic_wmwf_setupV_mpc2,vv_holomorphic_setupV_mpc
@@ -565,12 +565,22 @@ class AutomorphicFormSpace(Parent):
         #k = QQ(RR(self._weight)) 
         kk = ZZ(k - QQ(1)/QQ(2))
         r2 = valuation(N,2)
-        if(r2>=4):
-            zeta_k_l_chi = lambda_k_l_chi
+        s2 = valuation(cond,2)
+        if(r2>=4): #   zeta_k_l_chi = lambda_k_l_chi
+            if 2*s2 <= r2:
+                if is_even(r2):
+                    rp = r2/QQ(2)
+                    zeta_k_l_chi = 2**(rp) + 2**(rp-1)
+                else:
+                    rp = (r2-1)/QQ(2)
+                    zeta_k_l_chi = 2*2**(rp)
+            elif 2*s2 > r2:
+                zeta_k_l_chi = 2*2**(rp-sp)            
         elif(r2==3):
             zeta_k_l_chi = 3
         elif(r2==2):
             zeta_k_l_chi = 0
+            ## Condition (C)
             for p in prime_divisors(N):
                 if( (p % 4) == 3):
                     rp = valuation(N,p)
@@ -578,17 +588,18 @@ class AutomorphicFormSpace(Parent):
                     if(is_odd(rp) or (rp>0 and rp < 2*sp)):
                         zeta_k_l_chi = 2
                         break
-                    if(is_even(kk)):
-                        if(s2==0):
-                            zeta_k_l_chi = QQ(3)/QQ(2)
-                        elif(s2==2):
-                            zeta_k_l_chi = QQ(5)/QQ(2)
-                    else:
-                        if(s2==0):
-                            zeta_k_l_chi = QQ(5)/QQ(2)
-                        elif(s2==2):
-                            zeta_k_l_chi = QQ(3)/QQ(2)
-        if(zeta_k_l_chi<0):
+            if zeta_k_l_chi== 0: # not (C)
+                if(is_even(kk)):
+                    if(s2==0):
+                        zeta_k_l_chi = QQ(3)/QQ(2)
+                    elif(s2==2):
+                        zeta_k_l_chi = QQ(5)/QQ(2)
+                else:
+                    if(s2==0):
+                        zeta_k_l_chi = QQ(5)/QQ(2)
+                    elif(s2==2):
+                        zeta_k_l_chi = QQ(3)/QQ(2)
+        if(zeta_k_l_chi<=0):
             raise ArithmeticError,"Could not compute zeta(k,l,chi)!"
         fak = QQ(1)
         for p in prime_divisors(N):
@@ -663,13 +674,15 @@ class AutomorphicFormSpace(Parent):
             return self._dimension
         if self._weight < 2 or self.level()<>1:
             return -1
-        if hasattr(self._multiplier,"dimension_cusp_forms"):
-            if self._cuspidal:
-                self._dimension = self._multiplier.dimension_cusp_forms(self._weight)
-            else:
-                self._dimension = self._multiplier.dimension_modular_forms(self._weight)
-            return self._dimension
-        
+        try:
+            if hasattr(self._multiplier,"dimension_cusp_forms"):
+                if self._cuspidal:
+                    self._dimension = self._multiplier.dimension_cusp_forms(self._weight)
+                else:
+                    self._dimension = self._multiplier.dimension_modular_forms(self._weight)
+                return self._dimension
+        except:
+            pass
         term0 = QQ(self._rdim*(self._weight-1))/QQ(12)
         S,T=SL2Z.gens()
         R = S*T; R2=R*R
@@ -685,9 +698,9 @@ class AutomorphicFormSpace(Parent):
             wR=self._multiplier(R)        
             wR2=self._multiplier(R2)            
             wT=self._multiplier(T)
-        z2=CycloidalGroup(4).gen()
+        z2=CyclotomicField(4).gen()
         term1 = wS/QQ(4)*z2*z2**(self._weight-1)
-        z3=CycloidalGroup(6).gen()        
+        z3=CyclotomicField(6).gen()        
         term2 = wR/QQ(3)/sqrt(3)*z2*z3**(self._weight-1)
         term3 = wR/QQ(3)/sqrt(3)*z2*z3**(2*(self._weight-1))
         term4=0
@@ -2818,7 +2831,7 @@ class HarmonicWeakMaassForms(AutomorphicFormSpace):
     def __init__(self,G,weight=0,multiplier=None,holomorphic=False,weak=True,cuspidal=False,verbose=0,**kwds):
         r""" Initialize the space of automorphic forms.
         """
-        if(isinstance(G,MySubgroup)):
+        if(isinstance(G,MySubgroup_class)):
             self._group=G
             self._from_group=G._G
         else:
